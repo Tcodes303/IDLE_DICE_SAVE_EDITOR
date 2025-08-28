@@ -76,26 +76,19 @@
   </footer>
 
 <script>
-/* -------------------------
-   Config: known enums map
-   (populated from wiki/community findings)
-   ------------------------- */
+
 const ENUMS = {
-  rouletteFocus: ["none","card","multi","time"],       // Focus targets (wiki + saves)
-  // possible in-game settings — common sensible defaults
+  rouletteFocus: ["none","card","multi","time"],     
   prestigeMode: ["normal","hardcore","endless"],
   autoRollMode: ["off","slow","fast","max"],
   diceSkin: ["classic","neon","gold","random"],
   currencyType: ["money","diamonds","prestigePoints"],
-  // card suits / types often seen in saves (c0t1, c1t2 etc). Keep these options but still allow free edit:
   c0t1: ["A","2","3","4","5","6","7","8","9","10","J","Q","K"],
-  c0t2: ["pik","heart","diamond","club","cross","spade","club_de"], // some variants from community saves
+  c0t2: ["pik","heart","diamond","club","cross","spade","club_de"], 
   betOnBlack: ["true","false"]
 };
 
-/* -------------------------
-   Utilities
-   ------------------------- */
+
 function tryParseJson(s){
   try{ return JSON.parse(s); }catch(e){ return null; }
 }
@@ -112,45 +105,26 @@ function isNumericString(s){
   return typeof s === "string" && /^-?\d+(\.\d+)?$/.test(s.trim());
 }
 function tryParseNumberFromString(s){
-  // handle values like "1.234000e+3" or "12345"
   if (isScientificString(s) || isNumericString(s)) {
     const n = Number(s);
     if (!Number.isNaN(n) && Number.isFinite(n)) return n;
   }
   return null;
 }
-// format number to decimal string (no exponential) for display
 function decimalDisplay(n){
   if (Number.isInteger(n)) return n.toString();
-  // limit decimals sensibly
   return Number(n).toString();
 }
-// format number back into scientific-string like "1.000000e+0" (6 decimals) -- matches many save entries
 function toScientificString(n){
-  // Use 6 fractional digits like original saves: e.g. 1.000000e+0
-  // If it's very large, use exponent with sign and at least 2-digit exponent
   const s = Number(n).toExponential(6);
-  // ensure exponent uses + and no leading zeros beyond default — acceptable for game
   return s.replace('E','e');
 }
 
-/* -------------------------
-   State
-   ------------------------- */
+
 let state = { raw: null, obj: null, meta: {} };
 
-/* meta structure per key:
-   { originalType: 'string'|'number'|'bool'|'array'|'object',
-     originalRaw: original string (if string),
-     format: 'sci'|'plain'|'json'|null
-   }
-*/
-
-/* -------------------------
-   Rendering / field creation
-   ------------------------- */
 function createField(key, value){
-  // Determine meta if not present
+
   if (!state.meta[key]){
     const meta = {};
     meta.originalType = typeof value;
@@ -162,13 +136,9 @@ function createField(key, value){
     state.meta[key] = meta;
   }
 
-  // Prefer real booleans/number types if present
   const meta = state.meta[key];
-  // If the value is actual boolean (boolean type) OR string "true"/"false", treat as checkbox
   let isBool = (typeof value === 'boolean') || meta.format === 'boolstring';
-  // But if ENUMS contains key and includes strings "true"/"false" we still provide dropdown for explicit choice
   if (ENUMS[key] && Array.isArray(ENUMS[key])) {
-    // Provide select with options
     const select = document.createElement('select');
     select.dataset.key = key;
     ENUMS[key].forEach(opt => {
@@ -187,7 +157,7 @@ function createField(key, value){
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.dataset.key = key;
-    // set checked from either boolean or string
+ 
     cb.checked = (value === true) || (String(value).toLowerCase() === 'true');
     cb.addEventListener('change', onFieldChange);
     label.appendChild(cb);
@@ -197,12 +167,12 @@ function createField(key, value){
     return label;
   }
 
-  // If the original looked like JSON array/object (string form), give a textarea for editing raw JSON
+ 
   if (meta.format === 'json' || (typeof value === 'string' && (value.trim().startsWith('[') || value.trim().startsWith('{')))) {
     const ta = document.createElement('textarea');
     ta.className = 'small mono';
     ta.dataset.key = key;
-    // show pretty JSON if possible
+   
     if (typeof value === 'string'){
       const parsed = tryParseJson(value);
       ta.value = parsed ? JSON.stringify(parsed, null, 2) : value;
@@ -213,7 +183,7 @@ function createField(key, value){
     return ta;
   }
 
-  // Numeric-looking string -> display normal decimal input
+  
   const parsed = (typeof value === 'string') ? tryParseNumberFromString(value) : (typeof value === 'number' ? value : null);
   if (parsed !== null){
     const inp = document.createElement('input');
@@ -225,7 +195,7 @@ function createField(key, value){
     return inp;
   }
 
-  // Default: free text input
+
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.dataset.key = key;
@@ -234,20 +204,17 @@ function createField(key, value){
   return inp;
 }
 
-/* -------------------------
-   UI glue: render entire object into grouped sections
-   ------------------------- */
+
 function renderObject(obj){
   const renderArea = document.getElementById('renderArea');
   renderArea.innerHTML = '';
 
-  // Create logical groups
+
   const generalKeys = ['version','time','lastExport','activePlaytime','passivePlaytime','prestigeNum','prestigeScore','totalScore','prestigeGain'];
   const settingsKeys = ['musicEnabled','soundEnabled','autoRollMode','diceSkin','betOnBlack','confirmEnabled','lock_basicAchievements'];
   const rouletteKeys = ['rouletteFocus','rouletteLevel','rouletteSpins','rouletteUnlocked','focusCharge','focusCharge_m'];
   const currencyPrefix = 'currency_';
 
-  // Helper to render pairs
   function appendSection(title, entries){
     if (!entries.length) return;
     const s = document.createElement('div');
@@ -266,31 +233,31 @@ function renderObject(obj){
     renderArea.appendChild(s);
   }
 
-  // Gather general
+
   const general = [];
   generalKeys.forEach(k => { if (k in obj) general.push([k, obj[k]]); });
 
-  // currencies
+
   const currencies = Object.entries(obj).filter(([k]) => k.startsWith(currencyPrefix));
 
-  // multipliers (keys containing "multi")
+  
   const multis = Object.entries(obj).filter(([k]) => /multi/i.test(k));
 
-  // rolls
+
   const rolls = ['rollInterval','rollAnim','rollInterval_m','rollAnim_m','rolled1','rolled2','rolled3','rolled4','rolled5','rolled6']
                 .filter(k => k in obj).map(k => [k, obj[k]]);
 
-  // roulette section entries
+ 
   const roulette = rouletteKeys.filter(k => k in obj).map(k=>[k,obj[k]]);
 
-  // prestige area
+ 
   const prestige = Object.entries(obj).filter(([k]) => /prestige/i.test(k));
 
-  // everything else (fallback)
+
   const listed = new Set([...general.map(x=>x[0]), ...currencies.map(x=>x[0]), ...multis.map(x=>x[0]), ...rolls.map(x=>x[0]), ...roulette.map(x=>x[0]), ...prestige.map(x=>x[0])]);
   const others = Object.entries(obj).filter(([k]) => !listed.has(k)).sort((a,b)=>a[0].localeCompare(b[0]));
 
-  // Append sections
+
   appendSection('General', general);
   appendSection('Currencies', currencies);
   appendSection('Multipliers / Bonuses', multis);
@@ -300,92 +267,86 @@ function renderObject(obj){
   appendSection('Other (advanced)', others);
 }
 
-/* -------------------------
-   Field change handler (autosaves)
-   ------------------------- */
+
 function onFieldChange(e){
   const el = e.target;
   const key = el.dataset.key;
   if (!key) return;
   let newVal;
 
-  // checkbox
+
   if (el.type === 'checkbox'){
     newVal = el.checked;
-    // If the original was "string" like "true"/"false", convert back to string to preserve original type
+   
     const meta = state.meta[key];
     if (meta && meta.format === 'boolstring'){ newVal = String(Boolean(newVal)); }
   }
-  // select
+
   else if (el.tagName.toLowerCase() === 'select'){
     newVal = el.value;
   }
-  // textarea (json)
+ 
   else if (el.tagName.toLowerCase() === 'textarea'){
     const raw = el.value.trim();
-    // if it parses as JSON, store as the original stringified compact form to keep save consistent
+    
     const parsed = tryParseJson(raw);
     if (parsed !== null){
-      // keep as string to mimic many saves where arrays are strings
+     
       newVal = JSON.stringify(parsed);
-      // update meta format
+     
       state.meta[key] = state.meta[key] || {};
       state.meta[key].format = 'json';
     } else {
       newVal = raw;
     }
   }
-  // normal input
+
   else {
     const val = el.value.trim();
-    // If original was sci string, convert input decimal to scientific-string on export
+   
     const meta = state.meta[key] || {};
     const parsedNum = Number(val);
     if (!Number.isNaN(parsedNum) && Number.isFinite(parsedNum) && (meta.format === 'sci' || meta.format === 'plain')) {
-      // keep in memory as Decimal (we will format on export)
+     
       newVal = parsedNum;
     } else {
       newVal = val;
     }
   }
 
-  // write to state.obj BUT preserve original formatting rule for export:
-  // We'll store the "raw" representation in state.objExport which we compute when updating the output box.
+
   state.obj[key] = newVal;
-  // Update live export
+ 
   updateExport();
 }
 
-/* -------------------------
-   Build export string (convert numbers back to formats if needed)
-   ------------------------- */
+
 function buildExportObject(){
-  // Make shallow clone of state.obj
+ 
   const out = {};
   for (let k of Object.keys(state.obj)){
     const val = state.obj[k];
     const meta = state.meta[k] || {};
     if (typeof val === 'number'){
-      // if original required scientific-string
+     
       if (meta.format === 'sci'){
-        out[k] = toScientificString(val); // keep as string (many saved numbers are strings)
+        out[k] = toScientificString(val); 
       } else if (meta.format === 'plain'){
-        // some original numeric strings used plain notation — return plain numeric-string with no sci
+        
         out[k] = String(val);
       } else {
-        // if original was number type in JSON, keep numeric
-        // Heuristic: if meta.originalType was 'number' keep numeric, else use string
+        
         if (meta.originalType === 'number') out[k] = val;
         else out[k] = String(val);
       }
     } else {
-      // if field is a string that contains valid JSON and meta.format=json, keep as compact string
+     
       if (typeof val === 'string' && meta.format === 'json'){
-        // ensure compact JSON form string (no spaces)
+      
         const parsed = tryParseJson(val);
         out[k] = (parsed !== null) ? JSON.stringify(parsed) : val;
       } else {
-        // default: keep as is
+      
         out[k] = val;
       }
     }
@@ -393,9 +354,7 @@ function buildExportObject(){
   return out;
 }
 
-/* -------------------------
-   update export textarea (live)
-   ------------------------- */
+
 function updateExport(){
   if (!state.obj) return;
   const exportedObj = buildExportObject();
@@ -404,9 +363,7 @@ function updateExport(){
   document.getElementById('outputBase64').value = b64;
 }
 
-/* -------------------------
-   Decode + render flow
-   ------------------------- */
+
 function decodeAndRenderFromBase64(b64){
   const decoded = safeAtob(b64);
   if (decoded === null){
@@ -418,11 +375,11 @@ function decodeAndRenderFromBase64(b64){
     alert('Decoded text is not valid JSON.');
     return;
   }
-  // init state
+
   state.raw = decoded;
-  state.obj = JSON.parse(JSON.stringify(parsed)); // clone
+  state.obj = JSON.parse(JSON.stringify(parsed)); 
   state.meta = {};
-  // prefill meta using original parsed object (important to capture original string formats)
+ 
   Object.keys(parsed).forEach(k=>{
     const v = parsed[k];
     state.meta[k] = { originalType: Array.isArray(v) ? 'array' : typeof v, originalRaw: (typeof v === 'string' ? v : undefined) };
@@ -432,15 +389,13 @@ function decodeAndRenderFromBase64(b64){
     else if (typeof v === 'string' && (v === 'true' || v === 'false')) state.meta[k].format = 'boolstring';
   });
 
-  // render
+ 
   renderObject(state.obj);
-  // attach input listeners already done by createField; ensure initial export is set
+  
   updateExport();
 }
 
-/* -------------------------
-   UI wiring
-   ------------------------- */
+
 document.getElementById('btnDecode').addEventListener('click', ()=>{
   const b64 = document.getElementById('inputBase64').value.trim();
   if (!b64) return alert('Paste your Base64 save first.');
@@ -454,13 +409,13 @@ document.getElementById('btnAutoDecode').addEventListener('click', (e)=>{
 });
 document.getElementById('inputBase64').addEventListener('paste', (ev)=>{
   if (!autoDecode) return;
-  setTimeout(()=>{ // wait for paste to land
+  setTimeout(()=>{
     const b64 = document.getElementById('inputBase64').value.trim();
     if (b64) decodeAndRenderFromBase64(b64);
   }, 10);
 });
 
-// Copy / download
+
 document.getElementById('btnCopy').addEventListener('click', ()=>{
   const t = document.getElementById('outputBase64');
   t.select(); navigator.clipboard.writeText(t.value).then(()=>{ alert('Copied to clipboard'); }, ()=>{ alert('Copy failed'); });
@@ -473,15 +428,15 @@ document.getElementById('btnDownload').addEventListener('click', ()=>{
   URL.revokeObjectURL(url);
 });
 
-// quick load sample (your example save) for convenience
+
 document.getElementById('btnReset').addEventListener('click', ()=>{
-  // small sample (you can paste your full Base64 after)
+
   const sampleObj = {"main1_multi":"1.000000e+0","rouletteFocus":"card","totalScore":"2.713343e+10","version":"1.3.335","currency_0":"1.713343e+1","rolled1":"1.000000e+0","betOnBlack":"true"};
   document.getElementById('inputBase64').value = btoa(JSON.stringify(sampleObj));
   decodeAndRenderFromBase64(document.getElementById('inputBase64').value);
 });
 
-// load from url hash if provided (useful for testing)
+
 (function(){
   const hash = location.hash.slice(1);
   if (hash) {
